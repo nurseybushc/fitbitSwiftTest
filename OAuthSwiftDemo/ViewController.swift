@@ -10,7 +10,15 @@ import UIKit
 import OAuthSwift
 
 class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
-
+    //added to store oauth stuff
+    enum oauthKeys {
+        static let oauth_token = ""
+        static let oauth_token_secret = ""
+    }
+    //oauth stuff
+    var oauth_token = ""
+    var oauth_token_secret = ""
+    
     var services = ["Twitter", "Flickr", "Github", "Instagram", "Foursquare", "Fitbit", "Withings", "Linkedin", "Linkedin2", "Dropbox", "Dribbble", "Salesforce", "BitBucket", "GoogleDrive", "Smugmug", "Intuit", "Zaim", "Tumblr", "Slack", "Uber"]
 
     override func viewDidLoad() {
@@ -162,19 +170,86 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
             })
     }
     func doOAuthFitbit(){
+        let defaults = NSUserDefaults.standardUserDefaults()
+        if(self.oauth_token == ""){
         let oauthswift = OAuth1Swift(
-            consumerKey:    Fitbit["consumerKey"]!,
-            consumerSecret: Fitbit["consumerSecret"]!,
+            consumerKey: "53d18edc9d4335901db8290c29e0a576",
+            consumerSecret:"b84d0bd78d01ac9d73b417be5194af4b",
             requestTokenUrl: "https://api.fitbit.com/oauth/request_token",
             authorizeUrl:    "https://www.fitbit.com/oauth/authorize?display=touch",
             accessTokenUrl:  "https://api.fitbit.com/oauth/access_token"
         )
         oauthswift.authorizeWithCallbackURL( NSURL(string: "oauth-swift://oauth-callback/fitbit")!, success: {
             credential, response in
+            self.showAlertView("Fitbit", message: "oauth_token:\(credential.oauth_token)\n\noauth_token_secret:\(credential.oauth_token_secret)")
+            self.oauth_token = credential.oauth_token
+            self.oauth_token_secret = credential.oauth_token_secret
+            //print(credential.oauth_verifier)
+            //oauth stuff start
+            //let defaults = NSUserDefaults.standardUserDefaults()
+            defaults.setValue(credential.oauth_token, forKey: oauthKeys.oauth_token)
+            defaults.setValue(credential.oauth_token_secret, forKey: oauthKeys.oauth_token_secret)
+            defaults.synchronize()
+            //oath stuff end
+            
+            let parameters =  Dictionary<String, AnyObject>()
+            oauthswift.client.get("https://api.fitbit.com/1/user/-/profile.json", parameters: parameters,
+                success: {
+                    data, response in
+                    let dataString = NSString(data: data, encoding: NSUTF8StringEncoding)
+                    print(dataString)
+                }, failure: {(error:NSError!) -> Void in
+                    print(error)
+            })
+            }, failure: {(error:NSError!) -> Void in
+                print(error.localizedDescription)
+        })} else {
+            self.showAlertView("Fitbit", message: "oauth_token:\(oauth_token)\n\noauth_token_secret:\(oauth_token_secret)")
+            //let defaults = NSUserDefaults.standardUserDefaults()
+            print(defaults.stringForKey(oauthKeys.oauth_token))
+            print(defaults.stringForKey(oauthKeys.oauth_token_secret))
+        }
+    }
+    func doOAuthFitbit2(){
+        //https://dev.fitbit.com/docs/oauth2/
+        if (self.oauth_token == ""){
+        let oauthswift = OAuth2Swift(
+            consumerKey: "53d18edc9d4335901db8290c29e0a576",
+            //client_id:"229V2G",//oauth2 required
+            consumerSecret:"b84d0bd78d01ac9d73b417be5194af4b",
+            //requestTokenUrl: "https://api.fitbit.com/oauth/request_token",//oauth1
+            //authorizeUrl:    "https://www.fitbit.com/oauth/authorize?display=touch",//oauth1
+            authorizeUrl: "https://www.fitbit.com/oauth2/authorize?display=touch",
+            //accessTokenUrl:  "https://api.fitbit.com/oauth/access_token",//oauth1
+            accessTokenUrl: "https://api.fitbit.com/oauth2/token",
+            responseType:"code"//oauth2 required, "code" for authorization, "token" for implicit grant
+        )
+        let state: String = generateStateWithLength(20) as String//oauth2 required
+        oauthswift.authorizeWithCallbackURL( NSURL(string: "oauth-swift://oauth-callback/fitbit")!,
+            scope: "profile",//oauth2 required, can be "activity", "sleep", "social" etc.
+            state: state,//oauth2 required
+            success: {
+            credential, response, parameters in //oauth2 requires "parameters"
             self.showAlertView("Fitbit", message: "oauth_token:\(credential.oauth_token)\n\noauth_toke_secret:\(credential.oauth_token_secret)")
+            self.oauth_token = credential.oauth_token
+            self.oauth_token_secret = credential.oauth_token_secret
             }, failure: {(error:NSError!) -> Void in
                 print(error.localizedDescription)
         })
+        } else {
+            self.showAlertView("Fitbit", message: "oauth_token:\(oauth_token)\n\noauth_token_secret:\(oauth_token_secret)")
+            /*Alamofire.request(.GET, "https://api.fitbit.com/1/user/-/activities/date/today.json")
+                .responseJSON { response in
+                    print(response.request)  // original URL request
+                    print(response.response) // URL response
+                    print(response.data)     // server data
+                    print(response.result)   // result of response serialization
+                    
+                    if let JSON = response.result.value {
+                        print("JSON: \(JSON)")
+                    }
+            }*/
+        }
     }
 
     func doOAuthWithings(){
@@ -485,6 +560,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
             case "Foursquare":
                 doOAuthFoursquare()
             case "Fitbit":
+                //doOAuthFitbit2()
                 doOAuthFitbit()
             case "Withings":
                 doOAuthWithings()
